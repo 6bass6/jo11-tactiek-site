@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>JO11 Tactiek</title>
+  <meta name="theme-color" content="#0b2013">
+  <link rel="stylesheet" href="css/style.css?v=dfac85f">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">⚽ JO11 <span id="brand-sub">Tactiek</span></div>
+    <div class="hud" id="hud"></div>
+  </header>
+
+  <main id="game-app">
+    <!-- team code -->
+    <section id="scr-code" class="hidden">
+      <div class="card center-card">
+        <h1>Welkom!</h1>
+        <p class="muted">Vul de teamcode in die je van de trainer hebt gekregen.</p>
+        <form id="code-form">
+          <input type="text" id="code-input" autocomplete="off" autocapitalize="characters" placeholder="Teamcode">
+          <div class="error" id="code-error"></div>
+          <button class="btn" type="submit" style="width:100%">Verder</button>
+        </form>
+        <p style="margin-top:14px"><a class="linkbtn" href="index.html#trainer">Trainer? Naar het trainerspaneel</a></p>
+      </div>
+    </section>
+
+    <!-- pick your name -->
+    <section id="scr-name" class="hidden">
+      <div class="card">
+        <h2>Wie ben jij?</h2>
+        <p class="muted">Tik op je naam.</p>
+        <div class="names" id="names"></div>
+        <p class="muted" id="team-week"></p>
+      </div>
+    </section>
+
+    <!-- start screen -->
+    <section id="scr-home" class="hidden">
+      <div class="card center-card">
+        <h1 id="home-hello">Hoi!</h1>
+        <p class="muted" id="home-pos"></p>
+        <p>Je krijgt 10 situaties uit een wedstrijd. Kies telkens wat jij zou doen:</p>
+        <p class="hint" style="text-align:left">
+          🟡 <b>Sleep jezelf</b> (de gele speler) om te lopen of te dribbelen.<br>
+          ⚪ <b>Sleep de bal</b> om te passen of te schieten (als jij de bal hebt).
+        </p>
+        <div class="badges" id="home-badges"></div>
+        <button class="btn" id="btn-start" style="width:100%">Start ronde</button>
+        <p class="muted" id="home-team" style="margin-top:12px"></p>
+      </div>
+    </section>
+
+    <!-- the game -->
+    <section id="scr-game" class="hidden">
+      <div class="game">
+        <div class="info">
+          <div class="progress" id="progress"></div>
+          <div class="phase-tag" id="g-phase"></div>
+          <h2 id="g-title"></h2>
+          <p class="context" id="g-context"></p>
+          <p class="role" id="g-role"></p>
+          <p class="prompt" id="g-prompt"></p>
+          <p class="hint" id="g-hint"></p>
+          <p class="practice hidden" id="g-practice">Oefenpoging: probeer een andere keuze. Dit telt niet mee voor je punten.</p>
+        </div>
+        <div class="field-wrap" id="field"></div>
+        <div class="controls">
+          <div class="btn-row" id="g-confirm">
+            <button class="btn secondary" id="btn-undo" disabled>Opnieuw</button>
+            <button class="btn" id="btn-go" disabled>Klaar!</button>
+          </div>
+          <div class="result hidden" id="g-result">
+            <span class="pts" id="r-pts"></span>
+            <div class="rating" id="r-rating"></div>
+            <p class="outcome" id="r-outcome"></p>
+            <p id="r-text"></p>
+            <p class="best" id="r-best"></p>
+            <div class="legend"><span>Jouw keuze</span><span class="best" id="legend-best">Beste keuze</span><span class="zone" id="legend-zone">Goede plekken</span></div>
+            <div class="btn-row" style="margin-top:12px">
+              <button class="btn secondary" id="btn-best">Bekijk beste keuze</button>
+              <button class="btn secondary" id="btn-mine">Bekijk jouw keuze</button>
+              <button class="btn secondary" id="btn-retry">Probeer opnieuw</button>
+              <button class="btn" id="btn-next">Volgende</button>
+            </div>
+            <button class="linkbtn flag-link" id="btn-flag">Klopt dit niet?</button>
+            <div class="flag-box hidden" id="flag-box">
+              <textarea id="flag-text" rows="2" placeholder="Wat had jij gedaan, en waarom? (mag leeg blijven)"></textarea>
+              <button class="btn small secondary" id="btn-flag-send">Melden aan trainer</button>
+            </div>
+            <p class="muted" id="flag-msg"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- round summary -->
+    <section id="scr-summary" class="hidden">
+      <div class="card center-card">
+        <h2>Ronde klaar!</h2>
+        <div class="big-score" id="s-score"></div>
+        <p class="muted" id="s-sub"></p>
+        <div class="badges" id="s-badges"></div>
+        <ul class="rlist" id="s-list"></ul>
+        <div class="btn-row">
+          <button class="btn secondary" id="btn-stop">Stoppen</button>
+          <button class="btn" id="btn-again">Nog een ronde</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- coach panel (index.html#trainer): same page as the game, so both share the
+       saved data. Firefox keeps separate data for every file opened directly. -->
+  <main id="admin-app" class="hidden">
+    <section id="scr-login">
+      <div class="card center-card">
+        <h1>Trainerspaneel</h1>
+        <p class="muted" id="login-intro">Log in met je e-mailadres en wachtwoord.</p>
+        <form id="login-form">
+          <input type="email" id="login-email" autocomplete="username" placeholder="E-mailadres">
+          <input type="password" id="login-code" autocomplete="current-password" placeholder="Wachtwoord">
+          <div class="error" id="login-error"></div>
+          <button class="btn" type="submit" style="width:100%">Inloggen</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="scr-admin" class="hidden">
+      <div class="tabs" id="tabs">
+        <button data-tab="overzicht" class="active">Overzicht</button>
+        <button data-tab="fouten">Veelgemaakte fouten</button>
+        <button data-tab="spelers">Spelers</button>
+        <button data-tab="meldingen">Meldingen</button>
+        <button data-tab="selectie">Selectie</button>
+      </div>
+
+      <div class="filters" id="filters">
+        <select id="f-period">
+          <option value="7">Laatste 7 dagen</option>
+          <option value="30">Laatste 30 dagen</option>
+          <option value="0">Alles</option>
+        </select>
+        <select id="f-player"></select>
+        <select id="f-pos"></select>
+        <select id="f-phase"></select>
+      </div>
+
+      <div id="tab-overzicht" class="tab">
+        <div class="stats" id="stats"></div>
+        <div class="split">
+          <div class="card section">
+            <h3>Per spelfase</h3>
+            <div class="table-wrap"><table id="t-phase"></table></div>
+          </div>
+          <div class="card section">
+            <h3>Per positie</h3>
+            <div class="table-wrap"><table id="t-pos"></table></div>
+          </div>
+        </div>
+        <div class="card section">
+          <h3>Top 5 om te bespreken op de training</h3>
+          <div class="table-wrap"><table id="t-top"></table></div>
+        </div>
+      </div>
+
+      <div id="tab-fouten" class="tab hidden">
+        <div class="split">
+          <div>
+            <div class="card section">
+              <h3>Fouten</h3>
+              <p class="muted">Klik op een fout om voorbeelden te zien.</p>
+              <div class="table-wrap"><table id="t-tags"></table></div>
+            </div>
+            <div class="card section hidden" id="examples-card">
+              <h3 id="ex-title"></h3>
+              <p class="muted" id="ex-tip"></p>
+              <div class="table-wrap"><table id="t-examples"></table></div>
+            </div>
+          </div>
+          <div class="card section hidden" id="replay-card">
+            <h3 id="rp-title"></h3>
+            <div class="replay-text">
+              <p class="kv" id="rp-meta"></p>
+              <p id="rp-prompt"></p>
+              <p id="rp-choice"></p>
+            </div>
+            <div class="btn-row" style="margin:10px 0">
+              <button class="btn small secondary" id="rp-mine">Speel keuze af</button>
+              <button class="btn small secondary" id="rp-best">Speel beste keuze af</button>
+            </div>
+            <p class="muted" id="rp-outcome"></p>
+            <div id="rp-field"></div>
+            <div class="legend"><span>Keuze van de speler</span><span class="best">Beste keuze</span><span class="zone">Goede plekken</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-spelers" class="tab hidden">
+        <div class="card section">
+          <p class="muted">Klik op een speler om zijn of haar fouten te bekijken.</p>
+          <div class="table-wrap"><table id="t-players"></table></div>
+        </div>
+      </div>
+
+      <div id="tab-meldingen" class="tab hidden">
+        <div class="split">
+          <div class="card section">
+            <h3>Meldingen "Klopt dit niet?"</h3>
+            <p class="muted">Situaties waarbij iemand het niet eens was met de beoordeling. Klik om te bekijken. Met de downloadknop kun je ze opsturen, zodat de beoordeling verbeterd kan worden.</p>
+            <div class="table-wrap"><table id="t-flags"></table></div>
+            <div class="btn-row" style="margin-top:12px">
+              <button class="btn small secondary" id="flags-download">Download meldingen</button>
+            </div>
+          </div>
+          <div class="card section hidden" id="flag-replay-card">
+            <h3 id="fl-title"></h3>
+            <p class="kv" id="fl-meta"></p>
+            <p id="fl-prompt"></p>
+            <p id="fl-choice"></p>
+            <p id="fl-comment"></p>
+            <div id="fl-field"></div>
+            <div class="legend"><span>Keuze van de speler</span><span class="best">Beste keuze</span><span class="zone">Goede plekken</span></div>
+            <div class="btn-row" style="margin-top:10px"><button class="btn small secondary" id="fl-remove">Melding verwijderen</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-selectie" class="tab hidden">
+        <div class="card section">
+          <h3>Selectie</h3>
+          <p class="muted" id="r-intro">Namen en posities van je spelers. Na opslaan krijgen alle telefoons en tablets deze lijst de volgende keer dat het spel opent.</p>
+          <div class="table-wrap"><table id="t-roster"></table></div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn small secondary" id="r-add">+ Speler toevoegen</button>
+            <button class="btn small secondary" id="r-reset">Standaardlijst terugzetten</button>
+            <button class="btn small" id="r-save">Opslaan</button>
+          </div>
+          <p class="muted" id="r-msg"></p>
+        </div>
+        <div class="card section hidden" id="code-card">
+          <h3>Teamcode</h3>
+          <p class="muted">Met de teamcode komen spelers in het spel. Kies een nieuwe code als de oude bij anderen bekend is geworden. De oude code werkt dan meteen niet meer: geef de nieuwe code aan je spelers.</p>
+          <div class="btn-row">
+            <input type="text" id="tc-new" autocomplete="off" placeholder="Nieuwe teamcode (minstens 6 tekens)">
+            <button class="btn small" id="tc-save">Teamcode wijzigen</button>
+          </div>
+          <p class="muted" id="tc-msg"></p>
+        </div>
+        <div class="card section" id="demo-card">
+          <h3>Testen</h3>
+          <p class="muted">Vul het paneel met nep-antwoorden om te zien hoe het werkt, of wis alle antwoorden op dit apparaat.</p>
+          <div class="btn-row">
+            <button class="btn small secondary" id="demo-add">200 testantwoorden toevoegen</button>
+            <button class="btn small secondary" id="demo-clear">Alle antwoorden wissen</button>
+          </div>
+          <p class="muted" id="demo-msg"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="data/team.js?v=dfac85f"></script>
+  <script src="js/core.js?v=dfac85f"></script>
+  <script src="js/templates.js?v=dfac85f"></script>
+  <script src="js/generator.js?v=dfac85f"></script>
+  <script src="js/judge.js?v=dfac85f"></script>
+  <script src="js/playout.js?v=dfac85f"></script>
+  <script src="js/fixsetup.js?v=dfac85f"></script>
+  <script src="js/config.js?v=dfac85f"></script>
+  <script src="js/storage.js?v=dfac85f"></script>
+  <script src="js/field.js?v=dfac85f"></script>
+  <script src="js/progress.js?v=dfac85f"></script>
+  <script src="js/app.js?v=dfac85f"></script>
+  <script src="js/admin.js?v=dfac85f"></script>
+</body>
+</html>
