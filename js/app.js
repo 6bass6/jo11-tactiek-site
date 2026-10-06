@@ -11,6 +11,9 @@
   let round = null; // { items: [], idx, points, streak, badgesBefore }
   let cur = null;   // { sc, action, result, sim }
 
+  // points and badges count from the coach's reset; the level uses all answers
+  const counted = () => myAnswers.filter(a => a.ts >= S.resetAt());
+
   const randSeed = () => (Math.floor(Math.random() * 2147483647) ^ Date.now()) >>> 0;
 
   // ---------- header ----------
@@ -71,8 +74,8 @@
     $('home-hello').textContent = 'Hoi ' + player.name + '!';
     const back = player.backup ? ' en soms ' + C.POS_NAME[player.backup] : '';
     $('home-pos').textContent = 'Jij speelt vooral ' + C.POS_NAME[player.main] + back + '.';
-    renderBadges($('home-badges'), PR.badgesFor(myAnswers), []);
-    $('home-team').textContent = 'Jouw punten deze week: ' + PR.weekPoints(myAnswers) + ' · Team: ' + await S.teamPoints(C.startOfWeek(Date.now()));
+    renderBadges($('home-badges'), PR.badgesFor(counted()), []);
+    $('home-team').textContent = 'Jouw punten deze week: ' + PR.weekPoints(counted()) + ' · Team: ' + await S.teamPoints(C.startOfWeek(Date.now()));
     show('scr-home');
   }
 
@@ -92,7 +95,7 @@
   $('btn-stop').onclick = () => { round = null; hud(); showHome(); };
 
   function startRound() {
-    round = { items: [], idx: 0, points: 0, streak: 0, used: [], badgesBefore: PR.badgesFor(myAnswers).map(b => b.key) };
+    round = { items: [], idx: 0, points: 0, streak: 0, used: [], badgesBefore: PR.badgesFor(counted()).map(b => b.key) };
     // a few "zet het team goed" situations at random places (not the first two);
     // they take a while to make, so they are made in the background now
     const slots = [2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5).slice(0, FIX_PER_ROUND);
@@ -443,7 +446,7 @@
     const goed = round.items.filter(i => i.rating === 'goed').length;
     $('s-score').textContent = round.points + ' punten';
     $('s-sub').textContent = goed + ' van de ' + ROUND + ' keer de goede keuze.' + (goed >= 8 ? ' Top!' : goed >= 5 ? ' Goed bezig!' : ' Blijf oefenen!');
-    const badges = PR.badgesFor(myAnswers);
+    const badges = PR.badgesFor(counted());
     const newKeys = badges.map(b => b.key).filter(k => !round.badgesBefore.includes(k));
     renderBadges($('s-badges'), badges, newKeys);
     const list = $('s-list');

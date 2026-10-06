@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>JO11 Tactiek</title>
   <meta name="theme-color" content="#0b2013">
-  <link rel="stylesheet" href="css/style.css?v=dfac85f">
+  <link rel="stylesheet" href="css/style.css?v=ea68292">
 </head>
 <body>
   <header class="topbar">
@@ -150,6 +150,7 @@
       </div>
 
       <div id="tab-overzicht" class="tab">
+        <p class="muted hidden" id="reset-info"></p>
         <div class="stats" id="stats"></div>
         <div class="split">
           <div class="card section">
@@ -241,6 +242,15 @@
           </div>
           <p class="muted" id="r-msg"></p>
         </div>
+        <div class="card section" id="reset-card">
+          <h3>Schone lei</h3>
+          <p class="muted">Begin opnieuw met tellen, bijvoorbeeld aan het begin van het seizoen. Het dashboard, de teampunten en de punten en badges van de spelers tellen dan vanaf nu. Er wordt niets gewist: alle oude antwoorden blijven bewaard. Het niveau van de spelers blijft zoals het is.</p>
+          <div class="btn-row">
+            <input type="text" id="reset-confirm" autocomplete="off" placeholder="Typ RESET">
+            <button class="btn small" id="reset-go">Schone lei</button>
+          </div>
+          <p class="muted" id="reset-msg"></p>
+        </div>
         <div class="card section hidden" id="code-card">
           <h3>Teamcode</h3>
           <p class="muted">Met de teamcode komen spelers in het spel. Kies een nieuwe code als de oude bij anderen bekend is geworden. De oude code werkt dan meteen niet meer: geef de nieuwe code aan je spelers.</p>
@@ -263,18 +273,18 @@
     </section>
   </main>
 
-  <script src="data/team.js?v=dfac85f"></script>
-  <script src="js/core.js?v=dfac85f"></script>
-  <script src="js/templates.js?v=dfac85f"></script>
-  <script src="js/generator.js?v=dfac85f"></script>
-  <script src="js/judge.js?v=dfac85f"></script>
-  <script src="js/playout.js?v=dfac85f"></script>
-  <script src="js/fixsetup.js?v=dfac85f"></script>
-  <script src="js/config.js?v=dfac85f"></script>
-  <script src="js/storage.js?v=dfac85f"></script>
-  <script src="js/field.js?v=dfac85f"></script>
-  <script src="js/progress.js?v=dfac85f"></script>
-  <script src="js/app.js?v=dfac85f"></script>
-  <script src="js/admin.js?v=dfac85f"></script>
+  <script src="data/team.js?v=ea68292"></script>
+  <script src="js/core.js?v=ea68292"></script>
+  <script src="js/templates.js?v=ea68292"></script>
+  <script src="js/generator.js?v=ea68292"></script>
+  <script src="js/judge.js?v=ea68292"></script>
+  <script src="js/playout.js?v=ea68292"></script>
+  <script src="js/fixsetup.js?v=ea68292"></script>
+  <script src="js/config.js?v=ea68292"></script>
+  <script src="js/storage.js?v=ea68292"></script>
+  <script src="js/field.js?v=ea68292"></script>
+  <script src="js/progress.js?v=ea68292"></script>
+  <script src="js/app.js?v=ea68292"></script>
+  <script src="js/admin.js?v=ea68292"></script>
 </body>
 </html>

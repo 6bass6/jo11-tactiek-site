@@ -40,6 +40,15 @@
     open();
   };
   $('btn-logout').onclick = () => { S.coachLogout(); location.reload(); };
+  $('reset-go').onclick = async () => {
+    if ($('reset-confirm').value.trim().toUpperCase() !== 'RESET') { $('reset-msg').textContent = 'Typ eerst RESET in het vakje.'; return; }
+    try {
+      const m = await S.resetScores();
+      $('reset-confirm').value = '';
+      $('reset-msg').textContent = 'Schone lei: er wordt geteld vanaf ' + fmtDate(m) + '. Alle oude antwoorden zijn bewaard.';
+      await load(); buildFilters(); render();
+    } catch (e) { $('reset-msg').textContent = 'Niet gelukt: ' + e.message; }
+  };
   $('tc-save').onclick = async () => {
     const code = $('tc-new').value.trim();
     if (code.length < 6) { $('tc-msg').textContent = 'De teamcode moet minstens 6 tekens hebben.'; return; }
@@ -63,10 +72,15 @@
     render();
   }
 
+  // everything stays stored; the dashboard shows what came after the reset
   async function load() {
-    answers = await S.getAnswers();
-    roster = await S.getRoster();
-    flags = await S.getFlags();
+    roster = await S.getRoster(); // also refreshes the reset moment
+    const since = S.resetAt();
+    answers = (await S.getAnswers()).filter(a => a.ts >= since);
+    flags = (await S.getFlags()).filter(f => (f.flaggedAt || f.ts || 0) >= since);
+    const info = $('reset-info');
+    info.classList.toggle('hidden', !since);
+    if (since) info.textContent = 'Teller op nul sinds ' + fmtDate(since) + '. Oudere antwoorden blijven bewaard, maar tellen hier niet mee.';
   }
 
   // ---------- filters ----------
@@ -266,7 +280,7 @@
   $('fl-remove').onclick = async () => {
     if (!flagSel) return;
     await S.removeFlag(flagSel);
-    flags = await S.getFlags();
+    flags = (await S.getFlags()).filter(f => (f.flaggedAt || f.ts || 0) >= S.resetAt());
     flagSel = null;
     $('flag-replay-card').classList.add('hidden');
     renderFlags();

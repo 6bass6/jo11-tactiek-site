@@ -71,6 +71,10 @@ window.JO = window.JO || {};
     setInterval(flush, 60000);
   }
 
+  // the coach's reset moment (ms): points, badges and the dashboard count from here
+  const resetAt = () => read('team_info', {}).resetAt || 0;
+  const keepTeamInfo = d => write('team_info', { resetAt: d.resetAt || 0, settings: d.settings || {} });
+
   // answers kept on this device (for the player's progress, also offline)
   function keepLocal(a) {
     const all = read('answers', []);
@@ -123,6 +127,7 @@ window.JO = window.JO || {};
       const d = await rpc('join_team', { code });
       if (!d) return false;
       write('roster_cache', d.roster || []);
+      keepTeamInfo(d);
       setSession(Object.assign(getSession(), { team: true, teamCode: code }));
       flush();
       return true;
@@ -133,17 +138,24 @@ window.JO = window.JO || {};
     async getRoster() {
       if (!ONLINE) return read('roster', null) || JO.team.roster;
       if (getSession().coachAuth) {
-        try { const rows = await coachCall('/rest/v1/team?select=roster'); if (rows.length) return rows[0].roster; } catch (e) { console.error(e.message); }
+        try {
+          const rows = await coachCall('/rest/v1/team?select=roster,reset_at,settings');
+          if (rows.length) { keepTeamInfo({ resetAt: rows[0].reset_at, settings: rows[0].settings }); return rows[0].roster; }
+        } catch (e) { console.error(e.message); }
       }
       const code = getSession().teamCode;
       if (code) {
-        try { const d = await rpc('join_team', { code }); if (d) { write('roster_cache', d.roster || []); return d.roster || []; } }
+        try { const d = await rpc('join_team', { code }); if (d) { write('roster_cache', d.roster || []); keepTeamInfo(d); return d.roster || []; } }
         catch (e) { console.error('Selectie ophalen mislukt, de bewaarde lijst wordt gebruikt:', e.message); }
       }
       return read('roster_cache', []);
     },
 
-    // a player's own answers (online: from the server plus what is still waiting)
+    // the reset moment as last seen from the server (0 = never reset)
+    resetAt,
+
+    // a player's own answers, all of them, also from before the reset (the
+    // difficulty level uses all; points and badges only count from resetAt())
     async getMyAnswers(playerId) {
       const local = read('answers', []).filter(a => a.playerId === playerId && !a.practice);
       if (!ONLINE) return local;
@@ -158,6 +170,7 @@ window.JO = window.JO || {};
     },
     // points of the whole team since `since` (ms)
     async teamPoints(since) {
+      since = Math.max(since, resetAt());
       const local = read('answers', []).filter(a => a.ts >= since && !a.practice).reduce((s, a) => s + (a.points || 0), 0);
       if (!ONLINE) return local;
       try {
@@ -220,6 +233,13 @@ window.JO = window.JO || {};
       catch (e) { console.error('Selectie opslaan mislukt:', e.message); return false; }
     },
     async resetRoster() { try { localStorage.removeItem(P + 'roster'); } catch (e) { /* ignore */ } },
+    // "schone lei": count from now on; no answer is deleted. Returns the moment.
+    async resetScores() {
+      if (!ONLINE) { const m = Date.now(); write('team_info', Object.assign(read('team_info', {}), { resetAt: m })); return m; }
+      const m = await coachCall('/rest/v1/rpc/reset_scores', { method: 'POST', body: {} });
+      write('team_info', Object.assign(read('team_info', {}), { resetAt: m }));
+      return m;
+    },
     // online only: a new team code (the old one stops working)
     async setTeamCode(code) {
       await coachCall('/rest/v1/rpc/set_team_code', { method: 'POST', body: { new_code: code } });
