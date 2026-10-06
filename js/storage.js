@@ -4,7 +4,7 @@
 // answers and reports are sent to the database. Without internet they wait in
 // this browser (the "outbox") and are sent later. The coach logs in with email
 // and password and reads everything from the database.
-// Local (no url, or ?lokaal in the address): everything stays in this browser,
+// Local (no url, opened as a file or from localhost, or ?lokaal): everything stays in this browser,
 // with the codes and roster from data/team.js (for developing and testing).
 // All functions return Promises.
 window.JO = window.JO || {};
@@ -17,7 +17,12 @@ window.JO = window.JO || {};
     try { localStorage.setItem(P + k, JSON.stringify(v)); return true; } catch (e) { return false; }
   };
   const cfg = JO.config || {};
-  const ONLINE = !!cfg.supabaseUrl && !/[?&]lokaal/.test(location.search);
+  // Only the real website uses the database. Opened as a file or from a test
+  // server on this computer it is local, so testing never mixes with the team's
+  // answers. ?lokaal forces local, ?online forces online (for testing).
+  const onRealSite = /^https?:$/.test(location.protocol) && !['localhost', '127.0.0.1', ''].includes(location.hostname);
+  const ONLINE = !!cfg.supabaseUrl && !/[?&]lokaal/.test(location.search) &&
+    (onRealSite || /[?&]online/.test(location.search));
   const getSession = () => read('session', {});
   const setSession = s => write('session', s);
 
@@ -113,6 +118,12 @@ window.JO = window.JO || {};
       if (rows.length < 1000) break;
     }
     return out;
+  }
+
+  // local mode: show it, so nobody thinks answers are saved for the team
+  if (!ONLINE) {
+    const showTag = () => { const t = document.getElementById('test-tag'); if (t) t.classList.remove('hidden'); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showTag); else showTag();
   }
 
   JO.storage = {

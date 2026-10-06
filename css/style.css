@@ -173,6 +173,7 @@ select { font-size: 15px; padding: 8px 10px; }
 .ball.draggable .ball-ring { stroke: #ffb703; stroke-width: 0.4; }
 .good-zone circle { fill: #ffd60a; }
 .good-zone { opacity: 0.42; }
+.test-tag { font-size: 0.7em; background: #ffb703; color: #2a1a00; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
 .was-wrong { fill: none; stroke: #ff6b6b; stroke-width: 0.3; stroke-dasharray: 0.6 0.4; }
 .action-best.alt .arrow.best { opacity: 0.8; }
 .arrow { stroke-width: 0.45; fill: none; stroke-linecap: round; }
