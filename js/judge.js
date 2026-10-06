@@ -220,11 +220,40 @@ window.JO = window.JO || {};
     return open;
   }
 
+  // ---------- depth: a striker may be available for the next pass ----------
+  // A striker standing deep is often not available for the first pass, but is
+  // for the second: via a teammate who is free now, with a free line from that
+  // teammate to the striker. That counts almost as much (DEPTH_W).
+  const DEPTH_W = 0.85, DEPTH_ROLES = ['SP'], FREE_NOW = 0.8;
+  const freeNow = new WeakMap(); // per situation view: teammates free for the first pass
+  function freeMates(sc) {
+    let list = freeNow.get(sc);
+    if (!list) {
+      const carrier = sc.mates[sc.carrier.idx];
+      list = sc.mates.map((m, i) => ({ m, i, lane: 1 - interceptInfo(carrier, m, sc.opps).p }))
+        .filter(x => x.i !== sc.me && x.i !== sc.carrier.idx && x.m.pos !== 'K' && x.lane >= FREE_NOW);
+      freeNow.set(sc, list);
+    }
+    return list;
+  }
+  function viaLane(sc, P) {
+    let lane = 0, via = null;
+    freeMates(sc).forEach(x => {
+      const l = x.lane * (1 - interceptInfo(x.m, P, sc.opps).p);
+      if (l > lane) { lane = l; via = x.i; }
+    });
+    return { lane, via };
+  }
+
   function evalSupport(sc, P) {
     const carrier = sc.mates[sc.carrier.idx];
     const opps = sc.opps;
     const inter = interceptInfo(carrier, P, opps);
-    const lane = 1 - inter.p;
+    let lane = 1 - inter.p, via = null;
+    if (DEPTH_ROLES.includes(sc.mates[sc.me].pos)) {
+      const v2 = viaLane(sc, P);
+      if (DEPTH_W * v2.lane > lane) { lane = DEPTH_W * v2.lane; via = v2.via; }
+    }
     const rPress = pressure(P, opps);
     let score = Math.pow(lane, 1.5) * (0.06 + vUs(P, opps) * (sc.att || 1)) * (1 - 0.45 * rPress);
     let nearMate = 1e9;
@@ -237,7 +266,7 @@ window.JO = window.JO || {};
     // our defenders: leaving an opponent who stays up front free costs a lot
     const restO = REST_ROLES.includes(sc.mates[sc.me].pos) ? restOpen(sc, P) : 0;
     score -= REST_PEN * restO;
-    return { ev: score, lane, rPress, nearMate, dCar, len: inter.len, role: rf, restOpen: restO };
+    return { ev: score, lane, lane1: 1 - inter.p, via, rPress, nearMate, dCar, len: inter.len, role: rf, restOpen: restO };
   }
 
   // ---------- they have the ball ----------
@@ -571,7 +600,8 @@ window.JO = window.JO || {};
       if (a.y < me.y - 2) parts.push('je komt dichter bij het doel');
     } else if (sc.poss === 'us') {
       const carrier = sc.mates[sc.carrier.idx];
-      if (info.lane >= 0.7) parts.push('de lijn naar ' + carrier.name + ' is vrij');
+      if (info.via != null) parts.push('je bent aanspeelbaar na een pass via ' + sc.mates[info.via].name);
+      else if (info.lane >= 0.7) parts.push('de lijn naar ' + carrier.name + ' is vrij');
       if (info.rPress < 0.3) parts.push('er staat geen tegenstander vlakbij');
       if (a.y < me.y - 3) parts.push('je staat verder naar voren');
       if (info.role >= 0.8) parts.push('je blijft in jouw gebied als ' + C.POS_NAME[me.pos]);
