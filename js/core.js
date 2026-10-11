@@ -11,9 +11,23 @@ window.JO = window.JO || {};
   const POSITIONS = ['K', 'LA', 'CV', 'RA', 'LM', 'CM', 'RM', 'SP'];
   const POS_NAME = {
     K: 'keeper', LA: 'linksachter', CV: 'centrale verdediger', RA: 'rechtsachter',
-    LM: 'linkshalf', CM: 'centrale middenvelder', RM: 'rechtshalf', SP: 'spits'
+    LM: 'linkshalf', CM: 'centrale middenvelder', RM: 'rechtshalf', SP: 'spits',
+    CV2: 'tweede centrale verdediger'
   };
   const MIRROR = { K: 'K', LA: 'RA', RA: 'LA', CV: 'CV', LM: 'RM', RM: 'LM', CM: 'CM', SP: 'SP' };
+  // 1-4-3: no striker. The striker's job goes to a midfielder (SP -> CM), and the
+  // two centre backs are CV (left) and CV2 (right). Mirroring swaps them.
+  const FORMATIONS = {
+    '1-3-3-1': { roles: POSITIONS, mirror: MIRROR },
+    '1-4-3': {
+      roles: ['K', 'LA', 'CV', 'CV2', 'RA', 'LM', 'CM', 'RM'],
+      mirror: { K: 'K', LA: 'RA', RA: 'LA', CV: 'CV2', CV2: 'CV', LM: 'RM', RM: 'LM', CM: 'CM' }
+    }
+  };
+  const ALL_POSITIONS = POSITIONS.concat(['CV2']);
+  // the striker does not exist in 1-4-3
+  const formationPos = (pos, formation) => (formation === '1-4-3' && pos === 'SP' ? 'CM' : pos);
+  const label = pos => (pos === 'CV2' ? 'CV' : pos);
 
   const PHASES = {
     opbouw: 'Opbouwen',
@@ -95,6 +109,7 @@ window.JO = window.JO || {};
 
   JO.core = {
     W, L, GOAL_W, KEEPER_ZONE, RESTART_DIST, POSITIONS, POS_NAME, MIRROR, PHASES,
+    FORMATIONS, ALL_POSITIONS, formationPos, label,
     OUR_GOAL: { x: W / 2, y: L }, THEIR_GOAL: { x: W / 2, y: 0 },
     rng, hash, clamp, dist, lerp, segInfo, clampToField, towards, clone, startOfWeek, pickPosition
   };

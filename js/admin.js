@@ -87,7 +87,7 @@
   function buildFilters() {
     const opt = (v, t) => `<option value="${esc(v)}">${esc(t)}</option>`;
     $('f-player').innerHTML = opt('', 'Alle spelers') + roster.map(p => opt(p.id, p.name)).join('');
-    $('f-pos').innerHTML = opt('', 'Alle posities') + C.POSITIONS.map(p => opt(p, C.POS_NAME[p])).join('');
+    $('f-pos').innerHTML = opt('', 'Alle posities') + C.ALL_POSITIONS.map(p => opt(p, C.POS_NAME[p])).join('');
     $('f-phase').innerHTML = opt('', 'Alle spelfases') + Object.keys(C.PHASES).map(p => opt(p, C.PHASES[p])).join('');
     ['f-period', 'f-player', 'f-pos', 'f-phase'].forEach(id => { $(id).onchange = () => { selectedTag = null; render(); }; });
   }
@@ -152,7 +152,7 @@
       return html;
     };
     $('t-phase').innerHTML = groupTable(a => a.phase, Object.keys(C.PHASES), k => C.PHASES[k]);
-    $('t-pos').innerHTML = groupTable(a => a.mePos, C.POSITIONS, k => C.POS_NAME[k]);
+    $('t-pos').innerHTML = groupTable(a => a.mePos, C.ALL_POSITIONS, k => C.POS_NAME[k]);
 
     const tags = tagCounts(list).slice(0, 5);
     $('t-top').innerHTML = tags.length

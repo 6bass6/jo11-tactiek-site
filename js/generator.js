@@ -9,7 +9,8 @@ window.JO = window.JO || {};
   const MIN_GAP = 2.6; // players never overlap on screen
 
   // Team shape in the team's own frame (attacking towards y = 0).
-  function shape(inPoss, ball, block) {
+  function shape(inPoss, ball, block, formation) {
+    const roles = C.FORMATIONS[formation || '1-3-3-1'].roles;
     let defLine, midGap, spGap, shiftF, xs;
     if (inPoss) {
       defLine = C.clamp(ball.y + 8, 26, 52);
@@ -20,22 +21,27 @@ window.JO = window.JO || {};
       midGap = 10; spGap = 20; shiftF = 0.45;
       xs = { LA: 11, CV: CX, RA: W - 11, LM: 10, CM: CX, RM: W - 10, SP: CX };
     }
+    // 1-4-3: four backs, the two centre backs stand apart
+    if (roles.includes('CV2')) {
+      xs = inPoss ? { LA: 5, CV: CX - 4.5, CV2: CX + 4.5, RA: W - 5, LM: 6, CM: CX, RM: W - 6 }
+        : { LA: 11, CV: CX - 5.5, CV2: CX + 5.5, RA: W - 11, LM: 10, CM: CX, RM: W - 10 };
+    }
     defLine = C.clamp(defLine + (block || 0), 8, 58);
     const ys = {
-      LA: defLine, CV: defLine + 1.5, RA: defLine,
+      LA: defLine, CV: defLine + 1.5, CV2: defLine + 1.5, RA: defLine,
       LM: defLine - midGap, CM: defLine - midGap + 1, RM: defLine - midGap,
       SP: Math.max(5, defLine - spGap)
     };
     const out = {};
-    OUTFIELD.forEach(r => { out[r] = { x: xs[r] + (ball.x - CX) * shiftF, y: ys[r] }; });
+    roles.filter(r => r !== 'K').forEach(r => { out[r] = { x: xs[r] + (ball.x - CX) * shiftF, y: ys[r] }; });
     out.K = { x: CX + (ball.x - CX) * 0.15, y: C.clamp(defLine + 12, 55, 61.5) };
     return out;
   }
 
   const flip = p => ({ x: W - p.x, y: L - p.y });
 
-  function teamFromShape(sh) {
-    return ROLES.map(r => ({ pos: r, x: sh[r].x, y: sh[r].y }));
+  function teamFromShape(sh, roles) {
+    return (roles || ROLES).map(r => ({ pos: r, x: sh[r].x, y: sh[r].y }));
   }
 
   // Defending team presses the carrier and marks attackers (goal-side).
@@ -175,42 +181,68 @@ window.JO = window.JO || {};
   const isCornerT = t => t.special === 'corner_for' || t.special === 'corner_against';
 
   // ---------- template selection ----------
-  function orientations(t, mePos) {
+  function orientations(t, mePos, mirrorMap) {
     const res = [];
     [false, true].forEach(mirror => {
-      const meL = mirror ? C.MIRROR[mePos] : mePos;
+      const meL = mirror ? mirrorMap[mePos] : mePos;
       if (!t.me.includes(meL)) return;
       if (t.poss === 'us' && !t.meHasBall && !t.carriers.some(c => c !== meL)) return;
       if (t.meHasBall && !t.carriers.includes(meL)) return;
-      if (res.length && C.MIRROR[mePos] === mePos) { res.push(mirror); return; }
       res.push(mirror);
     });
     return res;
   }
 
-  function templatesFor(mePos) {
-    return JO.templates.filter(t => orientations(t, mePos).length > 0);
+  // Templates for a formation. 1-4-3 has no striker (a striker's job goes to a
+  // midfielder) and no corner kicks yet (those are built around a striker).
+  const pools = {};
+  function templatePool(formation) {
+    if (formation !== '1-4-3') return JO.templates;
+    if (!pools[formation]) {
+      const fix = arr => arr.map(r => (r === 'SP' ? 'CM' : r)).filter((r, i, a) => a.indexOf(r) === i);
+      pools[formation] = JO.templates.filter(t => !isCornerT(t)).map(t => Object.assign({}, t, {
+        me: fix(t.me), carriers: t.poss === 'us' ? fix(t.carriers) : t.carriers
+      }));
+    }
+    return pools[formation];
+  }
+
+  function templatesFor(mePos, formation) {
+    const mm = C.FORMATIONS[formation || '1-3-3-1'].mirror;
+    return templatePool(formation).filter(t => orientations(t, mePos, mm).length > 0);
   }
 
   function generateOnce(opts) {
     const seed = (opts.seed >>> 0) || 1;
     const R = C.rng(seed);
     const mePos = opts.mePos;
+    const formation = opts.formation || '1-3-3-1';
+    const mm = C.FORMATIONS[formation].mirror, roles = C.FORMATIONS[formation].roles;
     let t;
-    if (opts.templateId) t = JO.templates.find(x => x.id === opts.templateId);
+    if (opts.templateId) t = templatePool(formation).find(x => x.id === opts.templateId);
     if (!t) {
-      const all = templatesFor(mePos);
+      const all = templatesFor(mePos, formation);
       let pool = all.filter(x => !(opts.exclude || []).includes(x.id));
       if (opts.phase) {
         const ph = pool.filter(x => x.phase === opts.phase);
         if (ph.length) pool = ph;
       }
+      // match mode: who has the ball comes from how the previous stretch ended
+      if (opts.poss) {
+        const pp = pool.filter(x => x.poss === opts.poss);
+        if (pp.length) pool = pp;
+      }
+      // the player just won the ball back with a run or a move: the player has the ball now
+      if (opts.carry) {
+        const cc = pool.filter(x => x.meHasBall);
+        if (cc.length) pool = cc;
+      }
       if (!pool.length) pool = all;
       t = R.pick(pool);
     }
-    const ors = orientations(t, mePos);
+    const ors = orientations(t, mePos, mm);
     const mirror = ors.length > 1 ? R() < 0.5 : ors[0];
-    const meL = mirror ? C.MIRROR[mePos] : mePos;
+    const meL = mirror ? mm[mePos] : mePos;
     const level = opts.level || 0;
     const press = C.clamp((t.press ? R.range(t.press[0], t.press[1]) : 0.5) + level * 0.05, 0, 1);
     const ctx = R.pick(JO.contexts);
@@ -231,7 +263,7 @@ window.JO = window.JO || {};
     else {
       ball = { x: R.range(t.ball[0], t.ball[1]), y: R.range(t.ball[2], t.ball[3]) };
       if ((side < 0 && ball.x > CX + 2) || (side > 0 && ball.x < CX - 2)) ball.x = W - ball.x;
-      mates = teamFromShape(shape(t.poss === 'us', ball, t.ourBlock));
+      mates = teamFromShape(shape(t.poss === 'us', ball, t.ourBlock, formation), roles);
       const theirSh = shape(t.poss === 'them', flip(ball), t.oppBlock);
       opps = ROLES.map(r => { const p = flip(theirSh[r]); return { pos: r, x: p.x, y: p.y }; });
       const defTeam = t.poss === 'us' ? opps : mates;
@@ -264,7 +296,7 @@ window.JO = window.JO || {};
     var dropBack = t.id === 'achterbal_tegen' && tactics.achterbalTegen !== 'druk';
     // normal spot of every position (used to judge any teammate the same way)
     const homes = {};
-    const homeShape = isCornerT(t) ? null : dropBack ? shape(false, ball, 18) : shape(t.poss === 'us', ball, 0);
+    const homeShape = isCornerT(t) ? null : dropBack ? shape(false, ball, 18, formation) : shape(t.poss === 'us', ball, 0, formation);
     mates.forEach(m => { const h = homeShape ? homeShape[m.pos] : m; homes[m.pos] = { x: +h.x.toFixed(2), y: +h.y.toFixed(2) }; });
     const home = homes[meL];
 
@@ -282,7 +314,7 @@ window.JO = window.JO || {};
       if (t.poss === 'us') applyPress(opps, mates, carrierIdx, press, C.THEIR_GOAL, null);
       else if (dropBack) {
         // the team has already dropped back into its block; only the player still has to
-        const block = shape(false, ball, 18);
+        const block = shape(false, ball, 18, formation);
         mates.forEach((m, i) => {
           if (i === meIdx) return;
           const j = m.pos === 'K' ? 0.5 : 1.5;
@@ -314,7 +346,7 @@ window.JO = window.JO || {};
     });
 
     let sc = {
-      v: 1, seed, templateId: t.id, phase: t.phase, title: t.title, promptRaw: t.prompt,
+      v: 1, seed, formation, templateId: t.id, phase: t.phase, title: t.title, promptRaw: t.prompt,
       context: ctx.text, risk: ctx.risk, att: ctx.att, level,
       poss: t.poss, me: meIdx, carrier: { team: t.poss, idx: carrierIdx },
       ball: { x: ball.x, y: ball.y },
@@ -348,17 +380,19 @@ window.JO = window.JO || {};
   const swapLR = t => typeof t === 'string' ? t.replace(/[Ll]inker|[Rr]echter|[Ll]inks|[Rr]echts/g, w => LR[w]) : t;
 
   function mirrorScenario(sc) {
-    const m = p => Object.assign({}, p, { x: +(W - p.x).toFixed(2), pos: C.MIRROR[p.pos] });
+    const formation = sc.formation || '1-3-3-1';
+    const mm = C.FORMATIONS[formation].mirror;
+    const m = (p, map) => Object.assign({}, p, { x: +(W - p.x).toFixed(2), pos: map[p.pos] });
     const home = sc.home ? { x: +(W - sc.home.x).toFixed(2), y: sc.home.y } : null;
     let homes;
     if (sc.homes) {
       homes = {};
-      Object.keys(sc.homes).forEach(p => { homes[C.MIRROR[p]] = { x: +(W - sc.homes[p].x).toFixed(2), y: sc.homes[p].y }; });
+      Object.keys(sc.homes).forEach(p => { homes[mm[p]] = { x: +(W - sc.homes[p].x).toFixed(2), y: sc.homes[p].y }; });
     }
-    const mates = sc.mates.map(m), opps = sc.opps.map(m);
+    const mates = sc.mates.map(p => m(p, mm)), opps = sc.opps.map(p => m(p, C.MIRROR));
     // keep team arrays in standard role order
-    const order = arr => ROLES.map(r => arr.find(p => p.pos === r));
-    const om = order(mates), oo = order(opps);
+    const order = (arr, roles) => roles.map(r => arr.find(p => p.pos === r));
+    const om = order(mates, C.FORMATIONS[formation].roles), oo = order(opps, C.POSITIONS);
     const meNew = om.indexOf(mates[sc.me]);
     const cTeam = sc.carrier.team === 'us' ? mates : opps;
     const cNew = (sc.carrier.team === 'us' ? om : oo).indexOf(cTeam[sc.carrier.idx]);
@@ -379,7 +413,7 @@ window.JO = window.JO || {};
     const R = C.rng(sc.seed ^ 0x9e3779b9);
     const others = roster.filter(p => p.id !== playerId);
     const spots = sc.mates.map((m, i) => i).filter(i => i !== sc.me);
-    const chosen = chooseLineup(spots.map(i => sc.mates[i].pos), others, (JO.team || {}).invalKeeper, R);
+    const chosen = chooseLineup(spots.map(i => sc.mates[i].pos), others, (JO.team || {}).invalKeeper, R, sc.formation);
     const names = {};
     spots.forEach((i, k) => { if (chosen[k]) names[i] = chosen[k].name; });
     sc.mates.forEach((m, i) => { m.name = i === sc.me ? 'Jij' : (names[i] || m.pos); });
@@ -390,9 +424,12 @@ window.JO = window.JO || {};
   }
 
   // positions: one position per spot. Returns one player (or null) per spot.
-  function chooseLineup(positions, players, invalKeeperId, R) {
+  function chooseLineup(positions, players, invalKeeperId, R, formation) {
     const keeperFree = players.some(p => p.main === 'K' || p.backup === 'K');
-    const fits = (p, pos) => p.main === pos || p.backup === pos ||
+    // in 1-4-3 a centre back also fills the second centre back, a striker a midfield spot
+    const same = (code, pos) => code === pos || (formation === '1-4-3' &&
+      ((pos === 'CV2' && code === 'CV') || (pos === 'CM' && code === 'SP')));
+    const fits = (p, pos) => same(p.main, pos) || same(p.backup, pos) ||
       (pos === 'K' && !keeperFree && p.id === invalKeeperId);
     const cands = positions.map(pos => players.filter(p => fits(p, pos)));
     // all lineups with the most players on their own position
@@ -422,5 +459,5 @@ window.JO = window.JO || {};
     return sc.promptRaw.replace('{carrier}', carrierName);
   }
 
-  JO.gen = { generate, generateOnce, assignNames, chooseLineup, templatesFor, shape };
+  JO.gen = { generate, generateOnce, assignNames, chooseLineup, templatesFor, templatePool, shape };
 })();

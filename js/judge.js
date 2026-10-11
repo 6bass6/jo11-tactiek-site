@@ -44,10 +44,10 @@ window.JO = window.JO || {};
   // Size of each position's area: [sideways, forwards/backwards] in meters.
   // Wide players have a narrow but long area: they keep the width of the team.
   const ROLE_ZONE = {
-    K: [5, 5], LA: [5, 11], RA: [5, 11], CV: [7, 8],
+    K: [5, 5], LA: [5, 11], RA: [5, 11], CV: [7, 8], CV2: [7, 8],
     LM: [5, 12], RM: [5, 12], CM: [7, 10], SP: [8, 12]
   };
-  const ROLE_R = { K: 5, LA: 9, CV: 9, RA: 9, LM: 10, CM: 10, RM: 10, SP: 11 };
+  const ROLE_R = { K: 5, LA: 9, CV: 9, CV2: 9, RA: 9, LM: 10, CM: 10, RM: 10, SP: 11 };
   function roleFactor(sc, P) {
     if (!sc.home) return 1;
     const me = sc.mates[sc.me];
@@ -71,7 +71,7 @@ window.JO = window.JO || {};
       const tt = C.clamp(s.t, 0, 0.92);
       const reach = 1.2 + 0.1 * len * tt;
       let p = C.clamp(1 - s.d / reach, 0, 1);
-      p = 0.92 * Math.pow(p, 0.7);
+      p = 1.2 * Math.pow(p, 0.7); // interceptions a bit more common than before (was 0.92)
       // a defender close to the passer can be played around: he only blocks a
       // little (pressing works through `pressure`, not by blocking every line)
       p *= 0.3 + 0.7 * C.clamp((C.dist(d, a) - 1) / 4, 0, 1);
@@ -198,7 +198,7 @@ window.JO = window.JO || {};
   // has one of our players near them, not far on the wrong side, for when we
   // lose the ball. Not when the ball is in our own third (build-up).
   const REST_NEAR = 7, REST_WRONG_SIDE = 5, REST_PEN = 0.2;
-  const REST_ROLES = ['LA', 'CV', 'RA'];
+  const REST_ROLES = ['LA', 'CV', 'CV2', 'RA'];
   function restForwards(sc) {
     const t = (JO.team && JO.team.tactics) || {};
     if (t.restverdediging === 'uit' || sc.poss !== 'us' || sc.ball.y > L - 20) return [];
@@ -791,7 +791,9 @@ window.JO = window.JO || {};
     if (tag) {
       if (res.rating === 'goed') res.rating = 'oke';
       res.tags = res.tags.concat(tag);
-      res.text += ' ' + TAGS[tag].tip;
+      // always name the teammate who has the ball
+      const c = sc.mates[sc.carrier.idx];
+      res.text += ' ' + TAGS[tag].tip.replace('Wij hebben de bal', sc.carrier.idx === sc.me ? 'Jij hebt de bal' : (c.name || C.POS_NAME[c.pos]) + ' heeft de bal');
     } else if (action.run && res.rating === 'goed') res.text += ' En daarna goed doorgelopen!';
     return res;
   }

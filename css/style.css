@@ -110,6 +110,13 @@ select { font-size: 15px; padding: 8px 10px; }
   border-radius: 10px;
 }
 @media (max-width: 859px) { .field { max-height: 78vh; } }
+/* match screen on a computer: the explanation and the pitch fit in one window */
+@media (min-width: 860px) {
+  #scr-match .game { gap: 10px; }
+  #scr-match .ticker { min-height: 0; max-height: 96px; overflow: hidden; margin: 4px 0; }
+  #scr-match .info { font-size: 15px; }
+  #scr-match .field { max-width: 100%; max-height: calc(100vh - 230px); }
+}
 
 .result { border-radius: var(--radius); padding: 16px; border: 2px solid var(--line); background: var(--panel); }
 .result.goed { border-color: var(--good); }
@@ -149,13 +156,14 @@ select { font-size: 15px; padding: 8px 10px; }
 .spot { fill: #fff; }
 .goal-net { fill: rgba(255,255,255,0.18); }
 .net-line { stroke: rgba(255,255,255,0.45); stroke-width: 0.06; }
-.goal-frame { fill: none; stroke: #fff; stroke-width: 0.18; }
+.goal-frame { fill: none; stroke: #fff; stroke-width: 0.3; }
 .goal-mouth { stroke: #fff; stroke-width: 0.3; }
 .post { fill: #fff; }
 .player .body { stroke-width: 0.25; }
-.player.mate .body { fill: #1f5fe0; stroke: #fff; }
-.player.opp .body { fill: #d63c3c; stroke: #ffe1e1; }
-.player.me .body { fill: #ffb703; stroke: #fff; stroke-width: 0.3; }
+.player.mate .body { fill: url(#gMate); stroke: #fff; }
+.player.opp .body { fill: url(#gOpp); stroke: #ffe1e1; }
+.player.me .body { fill: url(#gMe); stroke: #fff; stroke-width: 0.3; }
+.player .pshadow { fill: rgba(0, 0, 0, 0.3); }
 .player .halo { fill: rgba(255,183,3,0.28); animation: pulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { 0%,100% { opacity: 0.35; } 50% { opacity: 1; } }
 .player text { text-anchor: middle; font-family: inherit; pointer-events: none; }
@@ -194,6 +202,60 @@ select { font-size: 15px; padding: 8px 10px; }
 .goal-hl { fill: #ffd60a; }
 .note rect { fill: rgba(0,0,0,0.78); }
 .note text { fill: #fff; font-size: 1.5px; font-weight: 800; text-anchor: middle; }
+
+/* ---------- POV view (standing on the field) ---------- */
+.pov { width: 100%; max-width: 760px; height: auto; aspect-ratio: 100 / 60; display: block; border-radius: 12px; touch-action: none; cursor: crosshair; }
+.pov-sky { fill: #9fd3ef; }
+.pov-base { fill: #3b8f3f; }
+.pov-grass-a { fill: #3b8f3f; stroke: #3b8f3f; stroke-width: 0.3; }
+.pov-grass-b { fill: #3a8c3d; stroke: #3a8c3d; stroke-width: 0.3; }
+.pov-line { fill: none; stroke: rgba(255,255,255,0.9); stroke-width: 0.25; }
+.pov-boundary { fill: none; stroke: #ffffff; stroke-width: 0.55; }
+.pov-outside { fill: #c9b27c; stroke: #c9b27c; stroke-width: 0.3; }
+.pov-mini-bg { fill: #2b3a42; }
+.pov-mark-tap { fill: #ffffff; opacity: 0.85; }
+.pov-mark-line { stroke: #ffffff; stroke-width: 0.25; stroke-dasharray: 0.7 0.5; opacity: 0.9; }
+.pov-mini-pitch { fill: #3b8f3f; stroke: #ffffff; stroke-width: 0.25; }
+.pov-mini-line { stroke: #ffffff; stroke-width: 0.2; }
+.pov-mini-goal-them { stroke: #ffd60a; stroke-width: 0.7; }
+.pov-mini-goal-us { stroke: #3ddc84; stroke-width: 0.7; }
+.pov-mini-fov { fill: rgba(255,214,10,0.3); stroke: rgba(255,214,10,0.7); stroke-width: 0.15; }
+.pov-mini-look { stroke: #ffd60a; stroke-width: 0.6; stroke-linecap: round; }
+.pov-mini-look-tip { fill: #ffd60a; }
+.pov-mini-me { fill: #ffd60a; stroke: #1a0d00; stroke-width: 0.2; }
+.pov-net { fill: rgba(255,255,255,0.12); stroke: none; }
+.pov-net-line { stroke: rgba(255,255,255,0.45); stroke-width: 0.12; }
+.pov-post { fill: none; stroke: #fff; stroke-width: 0.45; stroke-linejoin: round; }
+.pov-shirt-us { fill: #1f5fe0; stroke: #fff; stroke-width: 0.15; }
+.pov-shirt-them { fill: #d63c3c; stroke: #ffe1e1; stroke-width: 0.15; }
+.pov-head { fill: #f2c9a0; stroke: #5a3a22; stroke-width: 0.12; }
+.pov-name { fill: #fff; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(0,0,0,0.75); stroke-width: 0.5px; }
+.pov-ball { fill: #fff; stroke: #111; stroke-width: 0.12; }
+.pov-tools { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; flex-wrap: wrap; }
+.pov-tools button { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-weight: 700; cursor: pointer; }
+.pov-mark { fill: none; stroke: #ffb703; stroke-width: 0.45; stroke-dasharray: 1.2 0.8; }
+
+/* ---------- wedstrijd simulatie ---------- */
+.match-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-weight: 800; font-size: 18px; margin-bottom: 10px; }
+.field-wrap:has(.match-pop) { position: relative; }
+.match-pop { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); padding: 10px 22px; border-radius: 14px; background: var(--accent); color: var(--accent-ink); font-weight: 900; font-size: 22px; letter-spacing: .5px; white-space: nowrap; pointer-events: none; animation: match-pop 1.6s ease forwards; }
+.match-pop.goed { background: var(--good); }
+.match-pop.oke { background: var(--ok); }
+.match-pop.beter { background: var(--bad); }
+@keyframes match-pop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); } 25% { transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%); } }
+.match-head #m-clock { color: var(--muted); font-weight: 700; }
+.match-head #m-points { color: var(--accent); }
+.ticker { min-height: 96px; font-size: 14px; color: var(--muted); border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0; }
+.ticker div { padding: 2px 0; }
+.board { padding: 14px 16px; margin-top: 14px; }
+.board-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); font-weight: 800; margin-bottom: 6px; }
+.board-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 6px; font-size: 15px; border-radius: 6px; }
+.board-row.me { background: rgba(255,255,255,0.08); font-weight: 800; }
+.board-row b { color: var(--accent); }
+.result .rating { font-size: 22px; font-weight: 900; }
+.result .rating.goed { color: var(--good); }
+.result .rating.oke { color: var(--ok); }
+.result .rating.beter { color: var(--bad); }
 
 /* ---------- admin ---------- */
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }

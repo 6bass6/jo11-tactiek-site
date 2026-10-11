@@ -24,7 +24,27 @@ window.JO = window.JO || {};
     };
   }
 
+  // Every frame moves everybody: players the action did not move keep moving
+  // towards their normal spot, so the pitch never freezes except for a few players.
+  function settle(st, frames, ms, note) {
+    const prev = frames[frames.length - 1];
+    const same = (p, q) => Math.abs(p.x - q.x) < 1e-6 && Math.abs(p.y - q.y) < 1e-6;
+    const all = st.mates.concat(st.opps);
+    const moved = all.filter((p, i) => {
+      const q = i < st.mates.length ? prev.mates[i] : prev.opps[i - st.mates.length];
+      return !q || !same(p, q);
+    });
+    flow(st, moved, ms);
+    return snap(st, ms, note);
+  }
+
   const moveTo = (p, t, max) => { const q = C.towards(p, t, max == null ? 1e9 : max); p.x = q.x; p.y = q.y; };
+  // the player who lost a duel is knocked back a few metres, so the same duel does not restart at once
+  const pushAway = (p, from, d) => {
+    const dd = C.dist(p, from) || 0.01;
+    const q = C.clampToField({ x: p.x + (p.x - from.x) / dd * d, y: p.y + (p.y - from.y) / dd * d });
+    p.x = q.x; p.y = q.y;
+  };
   const durFor = (meters, speed, min, max) => C.clamp(meters / speed * 1000, min, max);
   const nameOf = (st, i) => st.mates[i].name || st.mates[i].pos;
   const pct = p => Math.round(C.clamp(p, 0, 1) * 10) * 10 + '%';
@@ -55,7 +75,7 @@ window.JO = window.JO || {};
   function flow(st, involved, ms) {
     const att = st.holder ? st.holder.team : null;
     const step = C.clamp(ms / 1000 * 5, 1, 4.5);
-    const ourShape = JO.gen.shape(att === 'us', st.ball, 0);
+    const ourShape = JO.gen.shape(att === 'us', st.ball, 0, st.formation);
     const theirShape = JO.gen.shape(att === 'them', flipP(st.ball), 0);
     const holderP = st.holder ? (st.holder.team === 'us' ? st.mates : st.opps)[st.holder.idx] : null;
     const attackers = att === 'them' ? st.opps : st.mates;
@@ -117,20 +137,20 @@ window.JO = window.JO || {};
       const e = M.evalShot(v, carrier, a, st.opps);
       const len = C.dist(carrier, a);
       const ms = durFor(len, 26, 250, 650);
-      if (e.pGoal >= 0.4) {
+      if (e.pGoal >= 0.25) {
         st.ball = { x: C.clamp(a.x, CX - 2.2, CX + 2.2), y: -0.6 }; st.holder = null;
-        frames.push(snap(st, ms, 'GOAL!'));
+        frames.push(settle(st, frames, ms, 'GOAL!'));
         return { end: true, text: 'Doelpunt! ⚽', kind: 'goal', chance: 'Kans op een doelpunt: ' + pct(e.pGoal) + '.' };
       }
       const k = st.opps.find(o => o.pos === 'K');
       if (e.pGoal >= 0.12 && k) {
         moveTo(k, { x: C.clamp(a.x, CX - 2.5, CX + 2.5), y: Math.max(0.8, k.y) }, 3);
         st.ball = { x: k.x, y: k.y + 0.5 }; st.holder = { team: 'them', idx: st.opps.indexOf(k) };
-        frames.push(snap(st, ms, 'Gered'));
+        frames.push(settle(st, frames, ms, 'Gered'));
         return { end: true, text: 'Het schot werd gestopt door de keeper.', kind: 'kans', chance: 'Kans op een doelpunt: ' + pct(e.pGoal) + '.' };
       }
       st.ball = { x: a.x + (a.x < CX ? -4.5 : 4.5), y: -1 }; st.holder = null;
-      frames.push(snap(st, ms, 'Naast'));
+      frames.push(settle(st, frames, ms, 'Naast'));
       return { end: true, text: 'Het schot ging naast: van hier is scoren erg moeilijk.', kind: 'mis', chance: 'Kans op een doelpunt: ' + pct(e.pGoal) + '.' };
     }
     if (a.type === 'dribble') {
@@ -147,14 +167,14 @@ window.JO = window.JO || {};
         moveTo(st.opps[best.i], best.point, 6);
         st.ball = { x: best.point.x, y: best.point.y }; st.holder = { team: 'them', idx: best.i };
         flow(st, [carrier, st.opps[best.i]], ms);
-        frames.push(snap(st, ms, duel ? 'Duel verloren' : 'Bal afgepakt'));
+        frames.push(settle(st, frames, ms, duel ? 'Duel verloren' : 'Bal afgepakt'));
         return { end: true, text: duel ? 'Een tegenstander won het duel en pakte de bal af.' : 'Een tegenstander pakte de bal af.', kind: 'verlies', chance, unlucky: duel };
       }
       moveTo(carrier, a);
       st.ball = { x: carrier.x, y: carrier.y };
       const reacted = teamReact(st.opps, carrier, C.THEIR_GOAL);
       flow(st, reacted.concat([carrier]), ms);
-      frames.push(snap(st, ms, duel ? 'Duel gewonnen' : ''));
+      frames.push(settle(st, frames, ms, duel ? 'Duel gewonnen' : ''));
       const who = nameOf(st, ci) === 'Jij' ? 'Je' : nameOf(st, ci);
       return { text: duel ? who + ' won het duel en dribbelde verder.' : who + ' dribbelde verder.', kind: 'veilig', chance, luck: duel };
     }
@@ -179,7 +199,7 @@ window.JO = window.JO || {};
       const involved = [st.opps[taker], carrier];
       if (e.recvIdx != null) { moveTo(st.mates[e.recvIdx], point, 2); involved.push(st.mates[e.recvIdx]); }
       flow(st, involved, ms);
-      frames.push(snap(st, ms, 'Onderschept'));
+      frames.push(settle(st, frames, ms, 'Onderschept'));
       const txt = a.to == null ? 'De tegenstander was als eerste bij de bal.' : 'De pass werd onderschept.';
       return { end: true, text: txt, kind: 'verlies', chance };
     }
@@ -191,9 +211,10 @@ window.JO = window.JO || {};
     if (winner >= 0) {
       const o = st.opps[winner];
       moveTo(o, st.mates[ri], C.dist(o, st.mates[ri]) - 0.8);
+      pushAway(st.mates[ri], o, 4);
       st.ball = { x: o.x, y: o.y }; st.holder = { team: 'them', idx: winner };
       flow(st, [o, st.mates[ri]], ms);
-      frames.push(snap(st, ms, 'Duel verloren'));
+      frames.push(settle(st, frames, ms, 'Duel verloren'));
       return { end: true, text: (who === 'Jij' ? 'Je kreeg de bal, maar een tegenstander zat er meteen bovenop en won het duel.' : 'De bal kwam bij ' + who + ', maar een tegenstander zat er meteen bovenop en won het duel.'), kind: 'verlies', chance, unlucky: true };
     }
     const reacted = teamReact(st.opps, { x: a.x, y: a.y }, C.THEIR_GOAL);
@@ -215,7 +236,7 @@ window.JO = window.JO || {};
       going.push(carrier);
     }
     flow(st, reacted.concat([st.mates[ri]], going), ms);
-    frames.push(snap(st, ms));
+    frames.push(settle(st, frames, ms));
     const free = M.pressure(st.mates[ri], st.opps) < 0.4;
     const txt = who === 'Jij' ? 'Jij kreeg de bal' + (free ? ' en staat vrij.' : '.') : 'De bal kwam aan bij ' + who + (free ? ', die vrij staat.' : '.');
     return { text: txt, kind: 'veilig', chance };
@@ -244,25 +265,31 @@ window.JO = window.JO || {};
     const v = viewFor(sc, st, 'them', ci, sc.me);
     const { opts } = M.threatOptions(v, st.mates);
     // a good team plays the most dangerous option that will probably work
-    const choice = opts.find(o => o.type === 'shot' || o.success >= 0.6) || opts[0];
+    // among the options that will probably work, a forward pass is worth more than a sideways one
+    // a team that is behind pushes forward more and takes more risk; one that is ahead plays safer
+    const push = sc.oppPush || 1;
+    const fwdBonus = o => o.type === 'shot' ? 1 : 1 + 0.06 * push * C.clamp(o.y - st.opps[ci].y, -5, 10);
+    const need = push > 1 ? 0.5 : push < 1 ? 0.7 : 0.6;
+    const safe = opts.filter(o => o.type === 'shot' || o.success >= need);
+    const choice = safe.length ? safe.reduce((b, o) => o.value * fwdBonus(o) > b.value * fwdBonus(b) ? o : b) : opts[0];
     const carrier = st.opps[ci];
     if (choice.type === 'shot') {
       const len = C.dist(carrier, C.OUR_GOAL);
       const ms = durFor(len, 26, 250, 650);
       if (choice.success >= 0.4) {
         st.ball = { x: CX + (carrier.x < CX ? 1.5 : -1.5), y: L + 0.6 }; st.holder = null;
-        frames.push(snap(st, ms, 'Tegendoelpunt'));
+        frames.push(settle(st, frames, ms, 'Tegendoelpunt'));
         return { end: true, text: 'De tegenstander scoorde.', kind: 'tegengoal' };
       }
       const k = st.mates.find(m => m.pos === 'K');
       if (k && choice.success >= 0.12) {
         moveTo(k, { x: C.clamp(carrier.x, CX - 2.5, CX + 2.5), y: k.y }, 2.5);
         st.ball = { x: k.x, y: k.y - 0.5 }; st.holder = { team: 'us', idx: st.mates.indexOf(k) };
-        frames.push(snap(st, ms, 'Gered'));
+        frames.push(settle(st, frames, ms, 'Gered'));
         return { end: true, text: 'De tegenstander schoot, maar onze keeper hield hem.', kind: 'gevaar' };
       }
       st.ball = { x: CX + (carrier.x < CX ? -5 : 5), y: L + 1 }; st.holder = null;
-      frames.push(snap(st, ms, 'Naast'));
+      frames.push(settle(st, frames, ms, 'Naast'));
       return { end: true, text: 'De tegenstander kon schieten, maar miste.', kind: 'gevaar' };
     }
     if (choice.type === 'dribble') {
@@ -277,7 +304,7 @@ window.JO = window.JO || {};
         moveTo(st.mates[best.i], best.point, 6);
         st.ball = { x: best.point.x, y: best.point.y }; st.holder = { team: 'us', idx: best.i };
         flow(st, [carrier, st.mates[best.i]], ms);
-        frames.push(snap(st, ms, duel ? 'Duel gewonnen' : 'Bal veroverd'));
+        frames.push(settle(st, frames, ms, duel ? 'Duel gewonnen' : 'Bal veroverd'));
         const who = nameOf(st, best.i);
         return { end: true, text: (who === 'Jij' ? 'Jij' : who) + (duel ? ' won het duel en pakte de bal af!' : ' pakte de bal af!'), kind: 'gewonnen', luck: duel };
       }
@@ -285,7 +312,7 @@ window.JO = window.JO || {};
       st.ball = { x: carrier.x, y: carrier.y };
       const reacted = teamReact(st.mates, carrier, C.OUR_GOAL);
       flow(st, reacted.concat([carrier]), ms);
-      frames.push(snap(st, ms));
+      frames.push(settle(st, frames, ms));
       return { text: 'De tegenstander kon met de bal naar voren dribbelen.', kind: 'gevaar' };
     }
     const len = C.dist(carrier, choice);
@@ -300,7 +327,7 @@ window.JO = window.JO || {};
       moveTo(st.mates[taker], point, 7);
       st.ball = { x: st.mates[taker].x, y: st.mates[taker].y }; st.holder = { team: 'us', idx: taker };
       flow(st, [st.mates[taker], carrier], ms);
-      frames.push(snap(st, ms, 'Onderschept'));
+      frames.push(settle(st, frames, ms, 'Onderschept'));
       const who = nameOf(st, taker);
       return { end: true, text: (who === 'Jij' ? 'Jij onderschepte' : who + ' onderschepte') + ' de pass!', kind: 'gewonnen' };
     }
@@ -310,15 +337,16 @@ window.JO = window.JO || {};
     if (winner >= 0) {
       const m = st.mates[winner];
       moveTo(m, st.opps[ri], C.dist(m, st.opps[ri]) - 0.8);
+      pushAway(st.opps[ri], m, 4);
       st.ball = { x: m.x, y: m.y }; st.holder = { team: 'us', idx: winner };
       flow(st, [m, st.opps[ri]], ms);
-      frames.push(snap(st, ms, 'Duel gewonnen'));
+      frames.push(settle(st, frames, ms, 'Duel gewonnen'));
       const who = nameOf(st, winner);
       return { end: true, text: (who === 'Jij' ? 'Jij zat er meteen bovenop en won' : who + ' zat er meteen bovenop en won') + ' het duel!', kind: 'gewonnen', luck: true };
     }
     const reacted = teamReact(st.mates, st.opps[ri], C.OUR_GOAL);
     flow(st, reacted.concat([st.opps[ri]]), ms);
-    frames.push(snap(st, ms));
+    frames.push(settle(st, frames, ms));
     const free = M.pressure(st.opps[ri], st.mates) < 0.4;
     return { text: free ? 'De tegenstander speelde een vrije medespeler aan.' : 'De tegenstander speelde de bal door.', kind: free ? 'gevaar' : 'neutraal' };
   }
@@ -328,6 +356,7 @@ window.JO = window.JO || {};
     const runKey = action.run ? [Math.round(action.run.x), Math.round(action.run.y)] : [];
     const R = C.rng(((seed >>> 0) ^ C.hash(JSON.stringify([action.type, Math.round(action.x), Math.round(action.y)].concat(runKey)))) >>> 0);
     const st = {
+      formation: sc.formation,
       mates: sc.mates.map(p => Object.assign({}, p)),
       opps: sc.opps.map(p => Object.assign({}, p)),
       ball: { x: sc.ball.x, y: sc.ball.y },
@@ -335,7 +364,7 @@ window.JO = window.JO || {};
     };
     const frames = [snap(st, 0)];
     const lines = [];
-    let res = null, chance = '';
+    let res = null, chance = '', lead = 0;
 
     if (sc.poss === 'us') {
       if (sc.carrier.idx === sc.me) {
@@ -354,7 +383,8 @@ window.JO = window.JO || {};
         const involved = [me];
         if (mi >= 0) { moveTo(st.opps[mi], C.towards(me, C.THEIR_GOAL, 1.8), Math.min(len * 0.6, 4)); involved.push(st.opps[mi]); }
         flow(st, involved, ms * 0.6);
-        frames.push(snap(st, ms));
+        // first the player walks to the spot he chose (the others keep moving), then the play goes on
+        frames.push(settle(st, frames, ms));
         const ci = sc.carrier.idx;
         const choice = bestOurs(sc, st, ci);
         const toMe = choice.type === 'pass' && (choice.to === sc.me ||
@@ -362,8 +392,9 @@ window.JO = window.JO || {};
         lines.push(toMe ? nameOf(st, ci) + ' speelde de bal naar jou.' : nameOf(st, ci) + ' koos voor een andere oplossing.');
         res = execOurs(sc, st, ci, choice, frames, R);
       }
-      // keep playing (up to two more actions) while we have the ball
-      for (let k = 0; k < 2 && !res.end && st.holder && st.holder.team === 'us'; k++) {
+      // keep playing (up to two more actions) while a teammate has the ball; when the player
+      // has it, the player decides (the match stops for them)
+      for (let k = 0; k < 2 && !res.end && st.holder && st.holder.team === 'us' && st.holder.idx !== sc.me; k++) {
         lines.push(res.text);
         const next = bestOurs(sc, st, st.holder.idx);
         if (!next) break;
@@ -375,25 +406,29 @@ window.JO = window.JO || {};
       const ms = durFor(len, 7.5, 400, 1100);
       moveTo(me, action);
       flow(st, [me, st.opps[sc.carrier.idx]], ms * 0.5);
-      frames.push(snap(st, ms));
+      lead = ms;
       const carrier = st.opps[sc.carrier.idx];
       // pressing right on the ball carrier: a duel. Better chance from the goal side.
-      const pWin = me.pos !== 'K' && C.dist(me, carrier) < 2.2 ? (me.y >= carrier.y - 0.5 ? 0.3 : 0.15) : 0;
+      const pWin = me.pos !== 'K' && C.dist(me, carrier) < 4 ? (me.y >= carrier.y - 0.5 ? 0.3 : 0.15) : 0;
       if (pWin && R() < pWin) {
         moveTo(me, carrier, C.dist(me, carrier) - 0.8);
+        pushAway(carrier, me, 4);
         st.ball = { x: me.x, y: me.y }; st.holder = { team: 'us', idx: sc.me };
         flow(st, [me, carrier], 500);
-        frames.push(snap(st, 500, 'Duel gewonnen'));
+        frames.push(settle(st, frames, 500, 'Duel gewonnen'));
         res = { end: true, text: 'Jij won het duel en pakte de bal af! (kans ' + pct(pWin) + ')', kind: 'gewonnen', luck: true };
       } else {
         if (pWin) lines.push('Je zette druk, maar de tegenstander won het duel (jouw kans was ' + pct(pWin) + ').');
         res = execTheirs(sc, st, frames, R);
       }
-      for (let k = 0; k < 2 && !res.end && st.holder && st.holder.team === 'them'; k++) {
+      // the opponent may keep the ball for up to four actions: a stretch ends somewhere new
+      for (let k = 0; k < 4 && !res.end && st.holder && st.holder.team === 'them'; k++) {
         lines.push(res.text);
         res = execTheirs(sc, st, frames, R);
       }
     }
+    // the walk and the first action play as one movement, not one after the other
+    if (lead && frames.length > 1) frames[1].ms = Math.max(frames[1].ms, lead);
     lines.push(res.text);
     if (chance) lines.push(chance);
     const good = ['goal', 'kans', 'veilig', 'gewonnen'].includes(res.kind);

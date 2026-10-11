@@ -47,6 +47,13 @@ window.JO = window.JO || {};
     container.innerHTML = '';
     container.appendChild(svg);
     const defs = el('defs', {}, svg);
+    // shaded player discs (look like rounded figures from above)
+    [['gMate', '#8fb6ff', '#1f5fe0', '#123a8c'], ['gOpp', '#ff9a8a', '#d63c3c', '#8f1f1f'], ['gMe', '#ffe38a', '#ffb703', '#b57a00']].forEach(([id, a, b, c]) => {
+      const g = el('radialGradient', { id, cx: 0.35, cy: 0.3, r: 0.75 }, defs);
+      el('stop', { offset: 0, 'stop-color': a }, g);
+      el('stop', { offset: 0.5, 'stop-color': b }, g);
+      el('stop', { offset: 1, 'stop-color': c }, g);
+    });
     [['arrow-me', 'arrow-me'], ['arrow-best', 'arrow-best'], ['arrow-them', 'arrow-them']].forEach(([id, cls]) => {
       const m = el('marker', { id, viewBox: '0 0 10 10', refX: 7, refY: 5, markerWidth: 4, markerHeight: 4, orient: 'auto-start-reverse' }, defs);
       el('path', { d: 'M0,0 L10,5 L0,10 z', class: cls }, m);
@@ -80,6 +87,7 @@ window.JO = window.JO || {};
       nodes = { mates: [], opps: [] };
       s.opps.forEach(p => {
         const g = el('g', { class: 'player opp' }, gPlayers);
+        el('ellipse', { cx: 0.3, cy: 0.45, rx: R_PLAYER * 0.95, ry: R_PLAYER * 0.7, class: 'pshadow' }, g);
         el('circle', { r: R_PLAYER, class: 'body' }, g);
         nodes.opps.push(g);
       });
@@ -87,9 +95,10 @@ window.JO = window.JO || {};
         const isMe = i === s.me;
         const g = el('g', { class: 'player mate' + (isMe ? ' me' : '') }, gPlayers);
         if (isMe) el('circle', { r: R_ME + 0.8, class: 'halo' }, g);
+        el('ellipse', { cx: 0.3, cy: 0.45, rx: (isMe ? R_ME : R_PLAYER) * 0.95, ry: (isMe ? R_ME : R_PLAYER) * 0.7, class: 'pshadow' }, g);
         el('circle', { r: isMe ? R_ME : R_PLAYER, class: 'body' }, g);
         const t = el('text', { y: 0.32, class: 'pos' }, g);
-        t.textContent = p.pos;
+        t.textContent = C.label(p.pos);
         const n = el('text', { y: (isMe ? R_ME : R_PLAYER) + 1.45, class: 'name' }, g);
         n.textContent = isMe ? 'JIJ' : (p.name || p.pos).slice(0, 9);
         if (isMe) el('circle', { r: 4, class: 'hit' }, g);

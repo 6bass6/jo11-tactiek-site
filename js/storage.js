@@ -76,6 +76,16 @@ window.JO = window.JO || {};
     setInterval(flush, 60000);
   }
 
+  // the ranking from a list of matches (used when there is no database)
+  function boardFrom(list) {
+    const by = {};
+    list.forEach(m => {
+      const r = by[m.playerId] || (by[m.playerId] = { playerId: m.playerId, name: m.playerName, best: 0, matches: 0 });
+      r.matches++; r.name = m.playerName; if (m.points > r.best) r.best = m.points;
+    });
+    return Object.values(by).sort((a, b) => b.best - a.best || b.matches - a.matches);
+  }
+
   // the coach's reset moment (ms): points, badges and the dashboard count from here
   const resetAt = () => read('team_info', {}).resetAt || 0;
   const keepTeamInfo = d => write('team_info', { resetAt: d.resetAt || 0, settings: d.settings || {} });
@@ -256,6 +266,37 @@ window.JO = window.JO || {};
       await coachCall('/rest/v1/rpc/set_team_code', { method: 'POST', body: { new_code: code } });
       return true;
     },
+    // ---------- match ranking: every finished match (online: saved in the database) ----------
+    // situations from match mode that were answered poorly: the training modes use them
+    addTrainingSituation(sc) {
+      const all = read('train_pool', []);
+      all.push(Object.assign({}, sc, { poolId: Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }));
+      while (all.length > 30) all.shift();
+      write('train_pool', all);
+    },
+    // answered well in training: it does not come back
+    removeTrainingSituation(poolId) {
+      write('train_pool', read('train_pool', []).filter(s => s.poolId !== poolId));
+    },
+    trainingPool() { return read('train_pool', []); },
+
+    async addMatch(m) {
+      const all = read('matches', []);
+      all.push(m);
+      while (all.length > 500) all.shift();
+      write('matches', all);
+      if (ONLINE) {
+        try { await rpc('submit_match_score', { code: getSession().teamCode, rec: m }); }
+        catch (e) { console.error('Wedstrijd opslaan mislukt:', e.message); }
+      }
+    },
+    // each player's best match and number of matches, best first
+    async matchBoard() {
+      if (!ONLINE) return boardFrom(read('matches', []));
+      try { return (await rpc('match_board', { code: getSession().teamCode })) || []; }
+      catch (e) { return boardFrom(read('matches', [])); }
+    },
+
     // test data (local mode only)
     async addAnswers(list) {
       const all = read('answers', []).concat(list);
